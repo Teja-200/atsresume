@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>ATS Resume Analyzer</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-indigo-100 via-slate-50 to-purple-100 p-6">
+
+    <!-- ================= HEADER ================= -->
+    <header class="max-w-6xl mx-auto text-center mb-14">
+        <div class="inline-flex items-center bg-indigo-600 text-white px-6 py-2 rounded-full shadow mb-5">
+            <i data-lucide="sparkles" class="w-5 h-5 mr-2"></i> AI ATS Resume Intelligence
+        </div>
+
+        <h1 class="text-5xl font-extrabold text-slate-900">
+            Resume Score Analyzer
+        </h1>
+
+        <p class="text-slate-600 mt-4 text-lg max-w-2xl mx-auto">
+            Upload your resume to get ATS score, professional summary, strengths, and improvement areas.
+        </p>
+    </header>
+
+    <!-- ================= MAIN ================= -->
+    <main class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10">
+
+        <!-- Upload Card -->
+        <div class="bg-white/80 backdrop-blur p-10 rounded-3xl shadow-xl border">
+            <h2 class="font-bold text-xl mb-6 flex items-center text-indigo-600">
+                <i data-lucide="upload-cloud" class="w-6 h-6 mr-3"></i> Upload Resume (PDF)
+            </h2>
+
+            <label class="flex flex-col items-center justify-center border-2 border-dashed border-indigo-300 rounded-2xl p-12 cursor-pointer hover:bg-indigo-50 transition">
+      <input id="fileInput" type="file" accept=".pdf" hidden />
+      <i data-lucide="cloud-upload" class="w-14 h-14 text-indigo-500 mb-4"></i>
+      <p class="font-semibold text-slate-700">Click or drag your PDF here</p>
+      <span class="text-xs text-slate-400 mt-1">PDF only • Max 10MB</span>
+    </label>
+
+            <button id="analyzeBtn" class="mt-8 w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:scale-[1.02] hover:shadow-lg text-white font-bold rounded-2xl transition-all">
+      Analyze Resume
+    </button>
+
+            <p id="statusText" class="mt-4 text-sm text-slate-500 text-center">
+                Waiting for resume upload
+            </p>
+        </div>
+
+        <!-- Score Card -->
+        <div class="bg-white/80 backdrop-blur p-12 rounded-3xl shadow-xl border flex flex-col items-center justify-center">
+
+            <div class="relative w-44 h-44 mb-5">
+                <svg class="w-full h-full -rotate-90">
+        <circle cx="88" cy="88" r="78" stroke="#e5e7eb" stroke-width="14" fill="none"/>
+        <circle id="progressCircle" cx="88" cy="88" r="78"
+          stroke="#6366f1" stroke-width="14" fill="none"
+          stroke-dasharray="490"
+          stroke-dashoffset="490"
+          stroke-linecap="round" />
+      </svg>
+
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span id="score" class="text-5xl font-black text-slate-900">--%</span>
+                </div>
+            </div>
+
+            <span class="uppercase tracking-widest text-xs text-slate-400">
+      ATS Match Score
+    </span>
+        </div>
+
+    </main>
+
+    <!-- ================= RESULTS ================= -->
+    <section id="resultSection" class="hidden max-w-6xl mx-auto mt-14">
+
+        <div class="bg-white rounded-3xl shadow-xl border overflow-hidden">
+
+            <!-- Tabs -->
+            <div class="flex border-b bg-slate-50">
+                <button onclick="showTab('summary')" id="tab-summary" class="flex-1 py-4 font-semibold text-indigo-600 border-b-2 border-indigo-600">
+        Summary
+      </button>
+                <button onclick="showTab('pros')" id="tab-pros" class="flex-1 py-4 font-semibold text-slate-500 hover:text-indigo-600">
+        Strengths
+      </button>
+                <button onclick="showTab('cons')" id="tab-cons" class="flex-1 py-4 font-semibold text-slate-500 hover:text-indigo-600">
+        Gaps
+      </button>
+            </div>
+
+            <!-- Summary -->
+            <div id="content-summary" class="p-10">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">Resume Overview</h3>
+                <p id="description" class="text-slate-700 leading-relaxed text-base"></p>
+            </div>
+
+            <!-- Pros -->
+            <div id="content-pros" class="hidden p-10">
+                <h3 class="text-xl font-bold text-emerald-600 mb-4">Key Strengths</h3>
+                <ul id="pros" class="space-y-3"></ul>
+            </div>
+
+            <!-- Cons -->
+            <div id="content-cons" class="hidden p-10">
+                <h3 class="text-xl font-bold text-rose-600 mb-4">Areas to Improve</h3>
+                <ul id="cons" class="space-y-3"></ul>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ================= SCRIPT ================= -->
+    <script>
+        lucide.createIcons();
+
+        const fileInput = document.getElementById("fileInput");
+        const analyzeBtn = document.getElementById("analyzeBtn");
+        const statusText = document.getElementById("statusText");
+        const resultSection = document.getElementById("resultSection");
+        const scoreEl = document.getElementById("score");
+        const descEl = document.getElementById("description");
+        const prosEl = document.getElementById("pros");
+        const consEl = document.getElementById("cons");
+        const circle = document.getElementById("progressCircle");
+
+        analyzeBtn.onclick = async() => {
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Please upload a PDF resume");
+                return;
+            }
+
+            statusText.innerText = "Analyzing resume...";
+            circle.style.strokeDashoffset = 490;
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const res = await fetch("/analyze", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+
+                scoreEl.innerText = data.score + "%";
+                circle.style.strokeDashoffset = 490 - (490 * data.score) / 100;
+
+                descEl.innerText = data.description;
+
+                prosEl.innerHTML = data.pros.map(p => `
+        <li class="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex gap-3">
+          <span class="text-emerald-600 font-bold">✔</span>${p}
+        </li>
+      `).join("");
+
+                consEl.innerHTML = data.cons.map(c => `
+        <li class="bg-rose-50 border border-rose-100 p-4 rounded-xl flex gap-3">
+          <span class="text-rose-600 font-bold">✖</span>${c}
+        </li>
+      `).join("");
+
+                resultSection.classList.remove("hidden");
+                showTab("summary");
+                statusText.innerText = "Analysis complete";
+
+            } catch (err) {
+                alert("Backend error");
+                console.error(err);
+            }
+        };
+
+        function showTab(tab) {
+            ["summary", "pros", "cons"].forEach(t => {
+                document.getElementById("content-" + t).classList.add("hidden");
+                document.getElementById("tab-" + t).classList.remove(
+                    "text-indigo-600", "border-b-2", "border-indigo-600"
+                );
+                document.getElementById("tab-" + t).classList.add("text-slate-500");
+            });
+
+            document.getElementById("content-" + tab).classList.remove("hidden");
+            document.getElementById("tab-" + tab).classList.add(
+                "text-indigo-600", "border-b-2", "border-indigo-600"
+            );
+        }
+    </script>
+
+</body>
+
+</html>
